@@ -28,24 +28,28 @@ the suggested remediation:
 docker pull nginx:latest
 ```
 
-`warp nginx check` builds on the same runtime resolution logic, then queries the
-published `nginx` tags on Docker Hub and prints a compact status report:
+`warp nginx check` builds on the same runtime resolution logic, then samples up
+to three Docker Hub pages (100 tags per page), ordered by last update. This
+avoids a full catalogue traversal, which can be blocked by Docker Hub/Cloudflare.
+The report uses `+N` as a lower bound: it means at least `N` newer releases were
+detected in the sampled tags, not an exact total across the full catalogue.
 
 ```bash
 Image reference: nginx:latest
 Local nginx version: 1.29.6
 Latest remote version: 1.30.0
-Released versions behind: 3
-Newer versions: 1.29.7 , 1.29.8 , 1.30.0
+Released versions behind (sample): +3
+Docker Hub pages sampled: 3
+Newer versions detected (sample): 1.29.7 , 1.29.8 , 1.30.0
 Status: still a valid version
 ```
 
 Decision rules:
 
 - if the detected version is lower than `1.25.1`, Warp prints a red `must be updated` warning
-- if `Released versions behind` is `0`, Warp prints `Status: up to date` in green
-- if `Released versions behind` is between `1` and `10`, Warp prints `Status: still a valid version` in green
-- if `Released versions behind` is greater than `10`, Warp prints `Status: outdated` in yellow plus:
+- if no newer release is detected in the sample, Warp prints `Status: no newer release detected in the sample` in green
+- if `+N` is between `+1` and `+10`, Warp prints `Status: still a valid version` in green
+- if `+N` is greater than `+10`, Warp prints `Status: outdated` in yellow plus:
   - `Recommendation: update nginx to a newer released version.`
   - `Suggested action: docker pull nginx:latest`
 

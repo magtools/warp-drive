@@ -220,13 +220,18 @@ import urllib.request
 hub_repo = os.environ["HUB_REPO"]
 local_version = os.environ["LOCAL_VERSION"]
 local_tuple = tuple(map(int, local_version.split(".")))
-url = f"https://hub.docker.com/v2/repositories/{hub_repo}/tags?page_size=100"
+max_pages = 3
+url = f"https://hub.docker.com/v2/repositories/{hub_repo}/tags?ordering=last_updated&page_size=100"
 versions = set()
+pages_read = 0
 
 try:
-    while url:
-        with urllib.request.urlopen(url) as response:
+    while url and pages_read < max_pages:
+        request = urllib.request.Request(url, headers={"User-Agent": "Warp/nginx-check"})
+        with urllib.request.urlopen(request, timeout=15) as response:
             payload = json.load(response)
+
+        pages_read += 1
 
         for item in payload.get("results", []):
             tag = item.get("name", "")
@@ -253,6 +258,8 @@ newer_versions = [
 print(f"REMOTE_LATEST={remote_latest}")
 print(f"BEHIND_COUNT={len(newer_versions)}")
 print(f"NEWER_VERSIONS={','.join(newer_versions)}")
+print(f"SAMPLED_PAGES={pages_read}")
+print(f"PARTIAL_SAMPLE={1 if url else 0}")
 PY
 }
 
@@ -315,6 +322,8 @@ webserver_check() {
     local _remote_latest=""
     local _behind_count=""
     local _newer_versions=""
+    local _sampled_pages=""
+    local _partial_sample=""
 
     if [[ $# -eq 1 && ( $1 == "-h" || $1 == "--help" ) ]]; then
         webserver_check_help
@@ -371,8 +380,10 @@ webserver_check() {
     _remote_latest=$(printf '%s\n' "$_compare_output" | sed -n 's/^REMOTE_LATEST=//p')
     _behind_count=$(printf '%s\n' "$_compare_output" | sed -n 's/^BEHIND_COUNT=//p')
     _newer_versions=$(printf '%s\n' "$_compare_output" | sed -n 's/^NEWER_VERSIONS=//p')
+    _sampled_pages=$(printf '%s\n' "$_compare_output" | sed -n 's/^SAMPLED_PAGES=//p')
+    _partial_sample=$(printf '%s\n' "$_compare_output" | sed -n 's/^PARTIAL_SAMPLE=//p')
 
-    if [ -z "$_remote_latest" ] || [ -z "$_behind_count" ]; then
+    if [ -z "$_remote_latest" ] || [ -z "$_behind_count" ] || [ -z "$_sampled_pages" ] || [ -z "$_partial_sample" ]; then
         warp_message_error "Could not parse remote nginx version data."
         return 2
     fi
@@ -380,17 +391,30 @@ webserver_check() {
     warp_message "Image reference: $_image"
     warp_message "Local nginx version: $_version_number"
     warp_message "Latest remote version: $_remote_latest"
-    warp_message "Released versions behind: $_behind_count"
+    if [ "$_partial_sample" = "1" ]; then
+        warp_message "Released versions behind (sample): +$_behind_count"
+        warp_message "Docker Hub pages sampled: $_sampled_pages"
+    else
+        warp_message "Released versions behind: $_behind_count"
+    fi
 
     if [ "$_behind_count" -gt 0 ] && [ -n "$_newer_versions" ]; then
-        warp_message "Newer versions: ${_newer_versions//,/ , }"
+        if [ "$_partial_sample" = "1" ]; then
+            warp_message "Newer versions detected (sample): ${_newer_versions//,/ , }"
+        else
+            warp_message "Newer versions: ${_newer_versions//,/ , }"
+        fi
     fi
 
     _current_int=$(webserver_version_to_int "$_version_number") || return 1
     _minimum_int=$(webserver_version_to_int "1.25.1") || return 1
 
     if [ "$_behind_count" -eq 0 ]; then
-        warp_message_ok "Status: up to date"
+        if [ "$_partial_sample" = "1" ]; then
+            warp_message_ok "Status: no newer release detected in the sample"
+        else
+            warp_message_ok "Status: up to date"
+        fi
         return 0
     fi
 
