@@ -20,14 +20,14 @@ then
         if [ $(uname -m) == 'arm64' ] ; then
             php_version=$( warp_question_ask_default "Set the PHP version of your project: $(warp_message_info [7.4-fpm-v2_arm]) " "7.4-fpm-v2_arm" )
         else 
-            php_version=$( warp_question_ask_default "Set the PHP version of your project: $(warp_message_info [7.4-fpm_v2]) " "7.4-fpm_v2" )
+            php_version=$( warp_question_ask_default "Set the PHP version of your project: $(warp_message_info [8.4.27-fpm]) " "8.4.27-fpm" )
         fi
         case $php_version in
-        '5.6-fpm' | '7.0-fpm' | '7.1.26-fpm' | '7.2.24-fpm' | '7.3-fpm' | '7.3-fpm_v2' | '7.3-fpm-v2_arm' | '7.4-fpm' | '7.4-fpm_v2' | '7.4-fpm-v2_arm' | '7.4.15-fpm' | '8.1.3-fpm' | '8.2.3-fpm' | '8.3-fpm' | '8.4-fpm')
+        '5.6-fpm' | '7.0-fpm' | '7.1.26-fpm' | '7.2.24-fpm' | '7.3-fpm' | '7.3-fpm_v2' | '7.3-fpm-v2_arm' | '7.4-fpm' | '7.4-fpm_v2' | '7.4-fpm-v2_arm' | '7.4.15-fpm' | '8.1.3-fpm' | '8.2.3-fpm' | '8.3-fpm' | '8.4-fpm' | '8.4.27-fpm')
             break
         ;;
         *)
-            warp_message_info2 "Selected: $php_version, the available versions are 5.6-fpm, 7.0-fpm, 7.1.26-fpm, 7.2-fpm, 7.2-fpm_arm, 7.2.24-fpm, 7.3-fpm, 7.3-fpm_v2, 7.3-fpm-v2_arm, 7.4-fpm, 7.4-fpm_v2, 7.4-fpm-v2_arm, 7.4.15-fpm, 8.1.3-fpm, 8.2.3-fpm, 8.3-fpm, 8.4-fpm"
+            warp_message_info2 "Selected: $php_version, the available versions are 5.6-fpm, 7.0-fpm, 7.1.26-fpm, 7.2-fpm, 7.2-fpm_arm, 7.2.24-fpm, 7.3-fpm, 7.3-fpm_v2, 7.3-fpm-v2_arm, 7.4-fpm, 7.4-fpm_v2, 7.4-fpm-v2_arm, 7.4.15-fpm, 8.1.3-fpm, 8.2.3-fpm, 8.3-fpm, 8.4-fpm, 8.4.27-fpm"
         ;;
         esac
     done

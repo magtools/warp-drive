@@ -9,11 +9,14 @@ Definir una PoC de imagen PHP propia, multiarch, compatible con un stack Magento
 Estado actualizado:
 
 ```text
-Tag moderno DockerHub: magtools/php:8.4.20-fpm
+Tag moderno DockerHub publicado: magtools/php:8.4.20-fpm
+Proximo tag de seguridad pendiente de build/publicacion: magtools/php:8.4.27-fpm
 Tags PoC historicos: magtools/php:8.4-fpm-poc-amd64, magtools/php:8.4-fpm-poc-arm64, magtools/php:8.4-fpm-poc
 ```
 
-Para nuevas pruebas de Magento 2.4.8 usar `magtools/php:8.4.20-fpm`. Los tags `*-poc-*` quedan como historial de build/smoke.
+Para nuevas pruebas de Magento 2.4.8 usar `magtools/php:8.4.20-fpm` hasta publicar y validar `magtools/php:8.4.27-fpm`. Los tags `*-poc-*` quedan como historial de build/smoke.
+
+El tag `8.4.27-fpm` se construye desde la base oficial exacta `php:8.4.27-fpm`, publicada el 2026-10-21. Fijar el patch evita que un rebuild posterior cambie silenciosamente de release PHP.
 
 Este archivo complementa:
 
@@ -25,7 +28,7 @@ La PoC debe probar primero `linux/amd64` y despues `linux/arm64`.
 ## 2. Principios
 
 1. No copiar literalmente los Dockerfiles legacy de `images/php/old`.
-2. Usar base oficial `php:8.4-fpm`.
+2. Usar la base oficial fijada `php:8.4.27-fpm`.
 3. Instalar extensiones en build time, no en cada arranque.
 4. Evitar binarios x86-only.
 5. Mantener compatibilidad con mounts actuales de Warp.
