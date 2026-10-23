@@ -305,10 +305,11 @@ scan_scraping_analyze_with_spinner()
     local _since_epoch="$4"
     local _window_seconds="$5"
     local _page_gap="$6"
+    local _client_ip_source="$7"
     local _pid
     local _status
 
-    scan_scraping_analyze "$_summary_file" "$_min_score" "$_request_time_field" "$_since_epoch" "$_window_seconds" "$_page_gap" &
+    scan_scraping_analyze "$_summary_file" "$_min_score" "$_request_time_field" "$_since_epoch" "$_window_seconds" "$_page_gap" "$_client_ip_source" &
     _pid=$!
     scan_scraping_spinner_wait "$_pid" "analyzing ${#SCAN_SCRAPING_FILES[@]} log file(s)"
     wait "$_pid"
@@ -363,8 +364,9 @@ scan_scraping_analyze()
     local _since_epoch="$4"
     local _window_seconds="$5"
     local _page_gap="$6"
+    local _client_ip_source="$7"
 
-    scan_scraping_stream_logs | awk -v min_score="$_min_score" -v request_time_field="$_request_time_field" -v since_epoch="$_since_epoch" -v window_seconds="$_window_seconds" -v page_gap="$_page_gap" -v progress_file="${WARP_SCAN_SCRAPING_PROGRESS_FILE:-}" '
+    scan_scraping_stream_logs | awk -v min_score="$_min_score" -v request_time_field="$_request_time_field" -v since_epoch="$_since_epoch" -v window_seconds="$_window_seconds" -v page_gap="$_page_gap" -v client_ip_source="$_client_ip_source" -v progress_file="${WARP_SCAN_SCRAPING_PROGRESS_FILE:-}" '
 function write_progress(force) {
     if (progress_file == "") {
         return
@@ -419,6 +421,22 @@ function normalize_target(target) {
     }
 
     return target
+}
+
+function first_forwarded_for(value, entries, count, i) {
+    if (value == "" || value == "-") {
+        return ""
+    }
+
+    count = split(value, entries, ",")
+    for (i = 1; i <= count; i++) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", entries[i])
+        if (entries[i] != "" && entries[i] != "-") {
+            return entries[i]
+        }
+    }
+
+    return ""
 }
 
 function is_interesting_path(path) {
@@ -717,10 +735,20 @@ BEGIN {
     status_field = parts[3]
 
     split(parts[1], prefix, " ")
-    ip = prefix[1]
-    if (ip == "") {
+    remote_ip = prefix[1]
+    if (remote_ip == "") {
         skipped++
         next
+    }
+
+    ip = remote_ip
+    if (client_ip_source == "xff-first") {
+        forwarded_for = (n >= 8) ? parts[8] : ""
+        ip = first_forwarded_for(forwarded_for)
+        if (ip == "") {
+            skipped++
+            next
+        }
     }
 
     sub(/^[[:space:]]+/, "", status_field)
@@ -848,6 +876,7 @@ END {
     print "METRIC\tsince_epoch\t" since_epoch
     print "METRIC\twindow_seconds\t" window_seconds
     print "METRIC\tpage_gap\t" page_gap
+    print "METRIC\tclient_ip_source\t" client_ip_source
 
     client_done = 0
     for (client_key in client_count) {
@@ -947,6 +976,7 @@ scan_scraping_print_human()
     local _since_epoch
     local _window_seconds
     local _page_gap
+    local _client_ip_source
     local _rows
 
     _parsed=$(scan_scraping_metric "$_summary_file" "parsed_lines")
@@ -957,6 +987,7 @@ scan_scraping_print_human()
     _since_epoch=$(scan_scraping_metric "$_summary_file" "since_epoch")
     _window_seconds=$(scan_scraping_metric "$_summary_file" "window_seconds")
     _page_gap=$(scan_scraping_metric "$_summary_file" "page_gap")
+    _client_ip_source=$(scan_scraping_metric "$_summary_file" "client_ip_source")
 
     echo "Files scanned:"
     printf '  - %s\n' "${SCAN_SCRAPING_FILES[@]}"
@@ -964,7 +995,7 @@ scan_scraping_print_human()
     echo
     echo "Parser:"
     echo "  parsed_lines=${_parsed:-0} skipped_lines=${_skipped:-0} skipped_since=${_skipped_since:-0} skipped_time=${_skipped_time:-0} request_time=${_request_time:-unknown}"
-    echo "  since_epoch=${_since_epoch:-0} window_seconds=${_window_seconds:-0} page_gap=${_page_gap:-4}"
+    echo "  since_epoch=${_since_epoch:-0} window_seconds=${_window_seconds:-0} page_gap=${_page_gap:-4} client_ip_source=${_client_ip_source:-remote}"
 
     echo
     echo "Suspicious clients (score >= $_min_score)"
@@ -1022,6 +1053,7 @@ scan_scraping_print_json()
     local _since_epoch
     local _window_seconds
     local _page_gap
+    local _client_ip_source
     local _file
     local _first=1
 
@@ -1033,6 +1065,7 @@ scan_scraping_print_json()
     _since_epoch=$(scan_scraping_metric "$_summary_file" "since_epoch")
     _window_seconds=$(scan_scraping_metric "$_summary_file" "window_seconds")
     _page_gap=$(scan_scraping_metric "$_summary_file" "page_gap")
+    _client_ip_source=$(scan_scraping_metric "$_summary_file" "client_ip_source")
 
     printf '{\n'
     printf '  "files": ['
@@ -1042,7 +1075,7 @@ scan_scraping_print_json()
         _first=0
     done
     printf '],\n'
-    printf '  "parser": {"parsed_lines": %s, "skipped_lines": %s, "skipped_since": %s, "skipped_time": %s, "request_time": "%s", "since_epoch": %s, "window_seconds": %s, "page_gap": %s},\n' "${_parsed:-0}" "${_skipped:-0}" "${_skipped_since:-0}" "${_skipped_time:-0}" "$(scan_scraping_json_string "${_request_time:-unknown}")" "${_since_epoch:-0}" "${_window_seconds:-0}" "${_page_gap:-4}"
+    printf '  "parser": {"parsed_lines": %s, "skipped_lines": %s, "skipped_since": %s, "skipped_time": %s, "request_time": "%s", "since_epoch": %s, "window_seconds": %s, "page_gap": %s, "client_ip_source": "%s"},\n' "${_parsed:-0}" "${_skipped:-0}" "${_skipped_since:-0}" "${_skipped_time:-0}" "$(scan_scraping_json_string "${_request_time:-unknown}")" "${_since_epoch:-0}" "${_window_seconds:-0}" "${_page_gap:-4}" "$(scan_scraping_json_string "${_client_ip_source:-remote}")"
 
     awk -F'\t' -v top_n="$_top_n" -v min_score="$_min_score" '
     function esc(s) {
@@ -1191,6 +1224,7 @@ scan_scraping_main()
     local _window=""
     local _window_seconds=0
     local _page_gap=4
+    local _client_ip_source="remote"
     local _progress=1
     local _progress_file=""
     local _total_bytes=0
@@ -1250,6 +1284,11 @@ scan_scraping_main()
                 shift
                 [ $# -gt 0 ] || { warp_message_error "--page-gap requires a value"; return 2; }
                 _page_gap="$1"
+                ;;
+            --client-ip-source)
+                shift
+                [ $# -gt 0 ] || { warp_message_error "--client-ip-source requires a value"; return 2; }
+                _client_ip_source="$1"
                 ;;
             --json)
                 _json=1
@@ -1324,6 +1363,15 @@ scan_scraping_main()
         return 2
     fi
 
+    case "$_client_ip_source" in
+        remote|xff-first) ;;
+        *)
+            warp_message_error "invalid --client-ip-source value: $_client_ip_source"
+            warp_message_error "use remote or xff-first"
+            return 2
+            ;;
+    esac
+
     if [ -n "$_since" ]; then
         _since_epoch=$(scan_scraping_since_to_epoch "$_since")
         if [ -z "$_since_epoch" ]; then
@@ -1380,7 +1428,7 @@ scan_scraping_main()
         fi
     fi
 
-    scan_scraping_analyze_with_spinner "$_summary_file" "$_min_score" "$_request_time_field" "$_since_epoch" "$_window_seconds" "$_page_gap"
+    scan_scraping_analyze_with_spinner "$_summary_file" "$_min_score" "$_request_time_field" "$_since_epoch" "$_window_seconds" "$_page_gap" "$_client_ip_source"
     _status=$?
     if [ $_status -ne 0 ]; then
         rm -f "$_summary_file" "$_tmp_output" "$_progress_file"
