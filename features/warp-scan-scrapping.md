@@ -81,6 +81,8 @@ warp scan scraping --json --output var/warp-scan/scraping.json
                          ejemplo 5m, 1h o 1d.
 --page-gap N            Gap maximo entre valores de `p` para considerarlos
                          parte de la misma racha. Default: 4.
+--client-ip-source SRC  Fuente de IP de cliente: `remote` (default) o
+                         `xff-first` para el primer valor de X-Forwarded-For.
 --format auto|combined|warp
                          Formato de access log. Default: auto.
 --request-time-field N  Campo numerico de request_time cuando no pueda detectarse.
@@ -112,6 +114,13 @@ misma fila.
 - `--page-gap 4` tambien agrupa secuencias con gaps chicos como `p=88,89,93`;
 - bajar el valor reduce falsos positivos cuando se quiere exigir navegacion
   mas consecutiva.
+
+`--client-ip-source xff-first` agrupa y cuenta las IPs por el primer valor del
+campo `X-Forwarded-For` registrado en el access log, en lugar de la IP que se
+conecto directamente a Nginx. Es util detras de un ELB/ALB y Cloudflare, donde
+la IP remota puede ser privada del balanceador. Debe usarse solo si el log
+registra ese header y la cadena de proxies es confiable; el header puede ser
+forjado si Nginx es accesible directamente desde Internet.
 
 Por defecto, el reporte sale por pantalla. `--save` escribe
 `warp-scan-scraping-YYYYmmdd-HHMMSS.txt` o `.json` en `var/log`, segun el
