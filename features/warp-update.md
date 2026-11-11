@@ -14,6 +14,10 @@ está disponible (incluyendo el 404 esperado antes del rename), usa el fallback.
 El origen que entregue la versión se conserva para descargar también
 `sha256sum.md` y `warp`; nunca se mezclan artefactos entre repositorios.
 
+Los avisos persistentes de update usan una caja de 80 columnas. Los detalles que
+superen el ancho se continúan en líneas adicionales, para conservar los errores
+completos de `curl` y las URLs de diagnóstico.
+
 ## 2) Directorio temporal y estado persistente
 
 Se usa:
@@ -155,6 +159,14 @@ Si no hay update:
 - limpia `.pending-update`
 
 El contenido de `.pending-update` se muestra al final de cada comando no excluido.
+
+### Check manual
+
+`warp update check` y `warp update --dry-run` ejecutan inmediatamente el mismo
+chequeo remoto que se activa al eliminar `.self-update-warp` y ejecutar un
+comando elegible. No descargan `warp`, `sha256sum.md` ni modifican `.warp` o el
+binario local. Actualizan `.pending-update` y el próximo check programado: siete
+días si tiene éxito, o un día si falla la conexión.
 
 ## 6) Integracion con comando `update`
 

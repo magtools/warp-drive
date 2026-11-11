@@ -638,12 +638,19 @@ warp_pending_update_write() {
 }
 
 warp_pending_update_box_border() {
-    printf '+%58s+\n' '' | tr ' ' '-'
+    # 80 columns total: "+" + 78 chars + "+".
+    printf '+%78s+\n' '' | tr ' ' '-'
 }
 
 warp_pending_update_box_line() {
-    # 60 columns total: "| " + 56 chars + " |"
-    printf '| %-56.56s |\n' "$1"
+    local _pending_update_line
+
+    # 80 columns total: "| " + 76 chars + " |". Fold instead of
+    # truncating so diagnostic output (URLs and curl errors) remains visible.
+    # Do not wrap only at spaces: a URL may be a single long word.
+    while IFS= read -r _pending_update_line || [ -n "$_pending_update_line" ]; do
+        printf '| %-76s |\n' "$_pending_update_line"
+    done < <(printf '%s\n' "$1" | fold -w 76)
 }
 
 warp_pending_update_clear() {
@@ -661,7 +668,7 @@ warp_pending_update_show() {
 }
 
 warp_date_plus_days_yyyymmdd() {
-    days_to_add="$1"
+    local days_to_add="$1"
     case "$(uname -s)" in
         Darwin)
             date -v +"${days_to_add}"d +%Y%m%d
@@ -675,8 +682,28 @@ warp_date_plus_days_yyyymmdd() {
     esac
 }
 
+warp_run_update_check() {
+    local _check_status
+    local _retry_days
+
+    warp_check_latest_version
+    _check_status=$?
+
+    if [ "$_check_status" -eq 0 ]; then
+        _retry_days="$CHECK_FREQUENCY_DAYS"
+    else
+        # If the remote check fails, retry the next day rather than in seven days.
+        _retry_days="1"
+    fi
+
+    warp_date_plus_days_yyyymmdd "$_retry_days" > "$CHECK_UPDATE_FILE" 2>/dev/null
+    return "$_check_status"
+}
+
 warp_post_command_hook() {
-    _cmd="$1"
+    local _cmd="$1"
+    local _today
+    local _next_check
 
     # keep stdout clean for these commands (e.g. mysql dump/pipe usage)
     if warp_should_skip_update_check "$_cmd"; then
@@ -690,12 +717,7 @@ warp_post_command_hook() {
         [ -f "$CHECK_UPDATE_FILE" ] && _next_check=$(cat "$CHECK_UPDATE_FILE")
 
         if [[ "$_today" -ge "$_next_check" ]]; then
-            if warp_check_latest_version; then
-                warp_date_plus_days_yyyymmdd "$CHECK_FREQUENCY_DAYS" > "$CHECK_UPDATE_FILE" 2>/dev/null
-            else
-                # If remote check fails, retry next day.
-                warp_date_plus_days_yyyymmdd "1" > "$CHECK_UPDATE_FILE" 2>/dev/null
-            fi
+            warp_run_update_check || :
         fi
     fi
 
@@ -1285,6 +1307,8 @@ warp_message_not_install_yet() {
 }
 
 warp_update() {
+    local _check_status
+
     WARP_TMP_DIR="$PROJECTPATH/var/warp-update"
     WARP_TMP_EXTRACT_DIR="$WARP_TMP_DIR/extracted"
     WARP_TMP_WARP="$WARP_TMP_DIR/warp"
@@ -1313,6 +1337,18 @@ warp_update() {
         echo "checking if there are images available to update"
         docker-compose -f "$DOCKERCOMPOSEFILE" pull
         exit 0;
+    fi
+
+    if [ "$1" = "check" ] || [ "$1" = "--dry-run" ]; then
+        warp_message_info "Checking for updates..."
+        warp_run_update_check
+        _check_status=$?
+
+        if [ "$_check_status" -eq 0 ] && [ ! -s "$(warp_pending_update_file)" ]; then
+            warp_message_info "Status: up to date"
+        fi
+
+        exit "$_check_status"
     fi
 
     if [ "$1" = "self" ] || [ "$1" = "--self" ] ; then
