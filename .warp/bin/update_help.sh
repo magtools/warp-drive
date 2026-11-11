@@ -4,13 +4,17 @@ function update_help_usage()
 {
     warp_message ""
     warp_message_info "Usage:"
-    warp_message      " warp update [options]"
+    warp_message      " warp update [--force]"
+    warp_message      " warp update check | --dry-run"
+    warp_message      " warp update self | --self"
+    warp_message      " warp update --images"
     warp_message ""
 
     warp_message ""
     warp_message_info "Options:"
     warp_message_info   " -h, --help         $(warp_message 'display this help message')"
     warp_message_info   " -f, --force        $(warp_message 'force update without confirmation')"
+    warp_message_info   " check, --dry-run   $(warp_message 'run the scheduled version check now; no artifacts are changed')"
     warp_message_info   " self, --self       $(warp_message 'apply payload from current ./warp without remote download')"
     warp_message_info   " --images           $(warp_message 'update images from hub registry docker')"
     warp_message ""
@@ -20,6 +24,9 @@ function update_help_usage()
     warp_message " warp update downloads dist/version.md, dist/sha256sum.md and dist/warp from"
     warp_message " GitHub's canonical Warp Drive source, with Phoenix Launch Silo as a temporary fallback,"
     warp_message " and validates SHA-256 before replacing ./warp."
+    warp_message " warp update check / --dry-run runs the same remote version check as the automatic check now."
+    warp_message " It updates the next-check schedule (+7 days on success, +1 day on connection error), writes"
+    warp_message " the pending status, and does not download or modify Warp artifacts."
     warp_message " warp update self / --self does not download remote artifacts: it applies the payload embedded in"
     warp_message " the current local ./warp and is the correct command when the executable is newer than .warp."
     warp_message " update and update --self are host-safe: with WARP_RUNTIME_MODE=host they do not require Docker."
@@ -34,6 +41,6 @@ function update_help_usage()
 
 function update_help()
 {
-    warp_message_info   " update             $(warp_message 'update warp framework')"
+    warp_message_info   " update             $(warp_message 'update Warp or check for available updates')"
 
 }
