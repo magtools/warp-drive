@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Keep the runtime security release explicit; do not silently move with 8.3-fpm.
-FROM php:8.3.36-fpm
+FROM php:8.3.37-fpm
 
 LABEL maintainer="Warp"
 
